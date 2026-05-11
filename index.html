@@ -1,0 +1,902 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Dream Hospital — KPI Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --bg: #f5f4f0;
+    --surface: #ffffff;
+    --surface2: #f0efe9;
+    --border: #e2e0d8;
+    --border2: #ccc9be;
+    --text: #1a1916;
+    --text2: #6b6860;
+    --text3: #9b9890;
+    --green: #1a7a4a;
+    --green-bg: #e8f5ee;
+    --green-border: #a8d8bc;
+    --red: #b83232;
+    --red-bg: #fdeaea;
+    --red-border: #f0b8b8;
+    --amber: #926210;
+    --amber-bg: #fef3dc;
+    --amber-border: #f0d080;
+    --blue: #1a4a8a;
+    --blue-bg: #e8f0fa;
+    --blue-border: #a8c0e8;
+    --accent: #2a5f8f;
+    --font: 'IBM Plex Sans', sans-serif;
+    --mono: 'IBM Plex Mono', monospace;
+    --radius: 6px;
+    --radius-lg: 10px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: var(--font); background: var(--bg); color: var(--text); font-size: 14px; line-height: 1.5; }
+  #app { min-height: 100vh; }
+
+  /* LAYOUT */
+  .shell { display: flex; min-height: 100vh; }
+  .sidebar {
+    width: 220px; min-height: 100vh; background: var(--text); color: #fff;
+    display: flex; flex-direction: column; flex-shrink: 0; position: fixed; top: 0; left: 0; bottom: 0; z-index: 100;
+  }
+  .sidebar-logo {
+    padding: 20px 20px 16px; border-bottom: 1px solid rgba(255,255,255,0.1);
+  }
+  .sidebar-logo .hosp { font-size: 13px; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; color: #fff; }
+  .sidebar-logo .sub { font-size: 11px; color: rgba(255,255,255,0.45); margin-top: 3px; font-family: var(--mono); }
+  .sidebar-nav { flex: 1; padding: 12px 0; }
+  .nav-section { padding: 10px 20px 4px; font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: rgba(255,255,255,0.3); }
+  .nav-item {
+    display: flex; align-items: center; gap: 10px; padding: 8px 20px;
+    font-size: 13px; color: rgba(255,255,255,0.65); cursor: pointer; transition: all 0.15s;
+    border-left: 2px solid transparent;
+  }
+  .nav-item:hover { color: #fff; background: rgba(255,255,255,0.06); }
+  .nav-item.active { color: #fff; background: rgba(255,255,255,0.1); border-left-color: #6aafff; }
+  .nav-item .dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+  .sidebar-footer { padding: 16px 20px; border-top: 1px solid rgba(255,255,255,0.1); }
+  .sidebar-footer .gsheet-status { font-size: 11px; color: rgba(255,255,255,0.4); font-family: var(--mono); }
+  .sidebar-footer .gsheet-status span { color: #6aff9a; }
+
+  .main { margin-left: 220px; flex: 1; }
+  .topbar {
+    background: var(--surface); border-bottom: 1px solid var(--border);
+    padding: 14px 28px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 50;
+  }
+  .topbar h1 { font-size: 16px; font-weight: 600; color: var(--text); }
+  .topbar .meta { font-size: 12px; color: var(--text2); font-family: var(--mono); }
+  .content { padding: 24px 28px; }
+
+  /* CARDS */
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); }
+  .card-header { padding: 16px 20px 12px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+  .card-title { font-size: 13px; font-weight: 600; color: var(--text); }
+  .card-body { padding: 20px; }
+
+  /* STAT CARDS */
+  .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 20px; }
+  .stat-card {
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg);
+    padding: 16px 18px;
+  }
+  .stat-card .label { font-size: 11px; color: var(--text2); text-transform: uppercase; letter-spacing: 0.06em; font-weight: 500; margin-bottom: 6px; }
+  .stat-card .value { font-size: 28px; font-weight: 300; color: var(--text); font-family: var(--mono); line-height: 1; }
+  .stat-card .sublabel { font-size: 11px; color: var(--text3); margin-top: 4px; }
+  .stat-card.green { border-left: 3px solid var(--green); }
+  .stat-card.red { border-left: 3px solid var(--red); }
+  .stat-card.amber { border-left: 3px solid var(--amber); }
+  .stat-card.blue { border-left: 3px solid var(--accent); }
+
+  /* KPI TABLE */
+  .kpi-table { width: 100%; border-collapse: collapse; }
+  .kpi-table th {
+    text-align: left; padding: 9px 14px; font-size: 10px; font-weight: 600;
+    text-transform: uppercase; letter-spacing: 0.07em; color: var(--text2);
+    background: var(--surface2); border-bottom: 1px solid var(--border);
+  }
+  .kpi-table td { padding: 11px 14px; border-bottom: 1px solid var(--border); font-size: 13px; vertical-align: middle; }
+  .kpi-table tr:last-child td { border-bottom: none; }
+  .kpi-table tr:hover td { background: var(--surface2); }
+  .kpi-code { font-family: var(--mono); font-size: 11px; color: var(--text3); }
+  .kpi-name { color: var(--text); font-weight: 500; max-width: 260px; }
+  .kpi-dept { font-size: 11px; padding: 2px 8px; border-radius: 3px; font-weight: 500; display: inline-block; }
+  .dept-GSR { background: var(--blue-bg); color: var(--blue); }
+  .dept-EQR { background: var(--amber-bg); color: var(--amber); }
+  .result-value { font-family: var(--mono); font-size: 14px; font-weight: 500; }
+  .status-badge {
+    display: inline-flex; align-items: center; gap: 5px;
+    font-size: 11px; font-weight: 600; padding: 3px 9px; border-radius: 3px;
+  }
+  .status-badge.met { background: var(--green-bg); color: var(--green); border: 1px solid var(--green-border); }
+  .status-badge.not-met { background: var(--red-bg); color: var(--red); border: 1px solid var(--red-border); }
+  .status-badge.no-data { background: var(--surface2); color: var(--text3); border: 1px solid var(--border); }
+  .status-dot { width: 5px; height: 5px; border-radius: 50%; background: currentColor; }
+  .target-val { font-size: 12px; color: var(--text2); font-family: var(--mono); }
+
+  /* FORM */
+  .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .field { display: flex; flex-direction: column; gap: 5px; }
+  .field.full { grid-column: 1/-1; }
+  .field label { font-size: 11px; font-weight: 600; color: var(--text2); text-transform: uppercase; letter-spacing: 0.05em; }
+  .field input, .field select, .field textarea {
+    background: var(--surface); border: 1px solid var(--border2);
+    border-radius: var(--radius); padding: 8px 11px; font-size: 13px;
+    font-family: var(--font); color: var(--text); outline: none; transition: border 0.15s;
+  }
+  .field input:focus, .field select:focus, .field textarea:focus { border-color: var(--accent); }
+  .field .hint { font-size: 11px; color: var(--text3); }
+  .field .formula-preview {
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 8px 11px; font-family: var(--mono);
+    font-size: 13px; color: var(--accent); min-height: 34px;
+  }
+
+  /* BUTTONS */
+  .btn {
+    display: inline-flex; align-items: center; gap: 7px;
+    padding: 9px 18px; border-radius: var(--radius); font-size: 13px; font-weight: 500;
+    font-family: var(--font); cursor: pointer; transition: all 0.15s; border: 1px solid transparent;
+  }
+  .btn-primary { background: var(--text); color: #fff; border-color: var(--text); }
+  .btn-primary:hover { background: #333; }
+  .btn-secondary { background: var(--surface); color: var(--text); border-color: var(--border2); }
+  .btn-secondary:hover { background: var(--surface2); }
+  .btn-success { background: var(--green); color: #fff; }
+  .btn-success:hover { opacity: 0.9; }
+  .btn:disabled { opacity: 0.45; cursor: not-allowed; }
+
+  /* SETUP PAGE */
+  .setup-step {
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg);
+    padding: 20px 24px; margin-bottom: 16px;
+  }
+  .step-num {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 26px; height: 26px; border-radius: 50%; background: var(--text);
+    color: #fff; font-size: 12px; font-weight: 600; flex-shrink: 0;
+  }
+  .step-header { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
+  .step-title { font-size: 14px; font-weight: 600; }
+  .step-desc { font-size: 13px; color: var(--text2); line-height: 1.6; }
+  .code-block {
+    background: #1a1916; color: #d4e8c4; font-family: var(--mono); font-size: 12px;
+    padding: 12px 16px; border-radius: var(--radius); margin: 10px 0; overflow-x: auto;
+    line-height: 1.6;
+  }
+  .code-block .c { color: #6aafff; }
+  .code-block .s { color: #f0c060; }
+  .setup-input-row { display: flex; gap: 10px; margin-top: 10px; align-items: flex-end; }
+  .setup-input-row .field { flex: 1; }
+
+  /* TOAST */
+  .toast {
+    position: fixed; bottom: 24px; right: 24px; z-index: 999;
+    background: var(--text); color: #fff; padding: 12px 18px; border-radius: var(--radius);
+    font-size: 13px; font-weight: 500; box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+    display: none; align-items: center; gap: 10px; max-width: 340px;
+  }
+  .toast.show { display: flex; }
+  .toast.success { background: var(--green); }
+  .toast.error { background: var(--red); }
+
+  /* PROGRESS BAR */
+  .progress-bar-wrap { background: var(--surface2); border-radius: 3px; height: 5px; flex: 1; overflow: hidden; }
+  .progress-bar-fill { height: 100%; border-radius: 3px; transition: width 0.4s; }
+  .progress-bar-fill.met { background: var(--green); }
+  .progress-bar-fill.not-met { background: var(--red); }
+  .progress-bar-fill.no-data { background: var(--border2); }
+
+  /* MONTH PICKER */
+  .month-row { display: flex; gap: 8px; align-items: center; margin-bottom: 16px; flex-wrap: wrap; }
+  .month-btn {
+    padding: 5px 12px; border: 1px solid var(--border2); border-radius: var(--radius);
+    background: var(--surface); font-size: 12px; cursor: pointer; font-family: var(--font);
+    transition: all 0.12s; color: var(--text2);
+  }
+  .month-btn.active { background: var(--text); color: #fff; border-color: var(--text); }
+  .month-btn:hover:not(.active) { background: var(--surface2); }
+
+  /* SECTION DIVIDER */
+  .dept-group-header {
+    font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em;
+    color: var(--text3); padding: 8px 14px 4px; background: var(--surface2);
+    border-bottom: 1px solid var(--border);
+  }
+
+  /* NO DATA STATE */
+  .empty-state { text-align: center; padding: 40px 20px; color: var(--text2); }
+  .empty-state .icon { font-size: 32px; margin-bottom: 8px; opacity: 0.3; }
+  .empty-state p { font-size: 13px; }
+
+  /* RESPONSIVE */
+  @media (max-width: 768px) {
+    .sidebar { width: 100%; min-height: auto; position: relative; flex-direction: row; flex-wrap: wrap; }
+    .main { margin-left: 0; }
+    .stats-grid { grid-template-columns: 1fr 1fr; }
+    .form-grid { grid-template-columns: 1fr; }
+  }
+
+  /* UTILS */
+  .flex { display: flex; }
+  .items-center { align-items: center; }
+  .gap-8 { gap: 8px; }
+  .gap-12 { gap: 12px; }
+  .gap-16 { gap: 16px; }
+  .mb-16 { margin-bottom: 16px; }
+  .mb-20 { margin-bottom: 20px; }
+  .text-muted { color: var(--text2); }
+  .text-small { font-size: 12px; }
+  .font-mono { font-family: var(--mono); }
+  .mt-8 { margin-top: 8px; }
+  .mt-12 { margin-top: 12px; }
+  .spinner {
+    width: 16px; height: 16px; border: 2px solid rgba(255,255,255,0.3);
+    border-top-color: #fff; border-radius: 50%; animation: spin 0.6s linear infinite; display: inline-block;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+<div id="app"></div>
+
+<script>
+// ─────────────────────────────────────────────
+// CONFIG — filled in by user during setup
+// ─────────────────────────────────────────────
+const CONFIG = {
+  SHEET_ID: localStorage.getItem('kpi_sheet_id') || '',
+  API_KEY:  localStorage.getItem('kpi_api_key')  || '',
+  SHEET_NAME: 'KPI_Data',
+};
+
+// ─────────────────────────────────────────────
+// KPI DEFINITIONS (from DHD-QPS-KPI-REG-01)
+// ─────────────────────────────────────────────
+const KPI_LIST = [
+  // GSR — General patient safety
+  { id:1, code:'GSR.01', std:'GSR.01/ACT.03', topic:'Patient identification', name:'Patient identification compliance rate', dept:'GSR', group:'General patient safety', form:'Nursing & OR', target:95, targetLabel:'≥ 95%', unit:'%' },
+  { id:2, code:'GSR.02', std:'GSR.02/ICD.18', topic:'Verbal & telephone orders', name:'Verbal/telephone order read-back compliance rate', dept:'GSR', group:'General patient safety', form:'Nursing & OR', target:95, targetLabel:'≥ 95%', unit:'%' },
+  { id:3, code:'GSR.03', std:'GSR.03/ICD.19', topic:'Critical results', name:'Critical results notification timeliness rate', dept:'GSR', group:'General patient safety', form:'Nursing & OR', target:95, targetLabel:'≥ 95%', unit:'%' },
+  { id:4, code:'GSR.04', std:'GSR.04/ACT.08', topic:'Handover communication', name:'Structured handover compliance rate', dept:'GSR', group:'General patient safety', form:'Nursing & OR', target:90, targetLabel:'≥ 90%', unit:'%' },
+  // GSR — Diagnostic
+  { id:5, code:'GSR.13', std:'GSR.13/DAS.22–23', topic:'Lab safety programme', name:'Lab safety incident investigation & corrective action rate', dept:'GSR', group:'Diagnostic & ancillary', form:'Laboratory', target:100, targetLabel:'100%', unit:'%' },
+  // GSR — Surgical
+  { id:6, code:'GSR.14', std:'GSR.14/SAS.05', topic:'Surgical site marking', name:'Surgical site marking compliance rate', dept:'GSR', group:'Surgical & invasive', form:'Nursing & OR', target:100, targetLabel:'100%', unit:'%' },
+  { id:7, code:'GSR.15', std:'GSR.15/SAS.06', topic:'Pre-operative checklist', name:'Pre-operative verification checklist completion rate', dept:'GSR', group:'Surgical & invasive', form:'Nursing & OR', target:100, targetLabel:'100%', unit:'%' },
+  { id:8, code:'GSR.16', std:'GSR.16/SAS.07', topic:'Time-out / sign-out', name:'Surgical time-out and sign-out documentation compliance rate', dept:'GSR', group:'Surgical & invasive', form:'Nursing & OR', target:100, targetLabel:'100%', unit:'%' },
+  { id:9, code:'GSR.17', std:'GSR.17/SAS.09', topic:'Instrument retention prevention', name:'Surgical instrument count completion rate', dept:'GSR', group:'Surgical & invasive', form:'Nursing & OR', target:100, targetLabel:'100%', unit:'%' },
+  // GSR — Medication
+  { id:10, code:'GSR.20', std:'GSR.20/MMS.06', topic:'High-alert medications', name:'High-alert medication storage and labelling compliance rate', dept:'GSR', group:'Medication safety', form:'Pharmacy', target:95, targetLabel:'≥ 95%', unit:'%' },
+  { id:11, code:'GSR.21', std:'GSR.21/MMS.07', topic:'LASA medications', name:'LASA medication segregation and labelling compliance rate', dept:'GSR', group:'Medication safety', form:'Pharmacy', target:95, targetLabel:'≥ 95%', unit:'%' },
+  // GSR — Information
+  { id:12, code:'GSR.29', std:'GSR.29/IMT.04', topic:'Approved abbreviations', name:'Medical record — approved abbreviations compliance rate', dept:'GSR', group:'Information management', form:'Medical Records', target:90, targetLabel:'≥ 90%', unit:'%' },
+  // EQR
+  { id:13, code:'EQR.04', std:'EQR.04/PCC.16', topic:'Complaints & suggestions', name:'Patient complaint resolution rate within defined turnaround', dept:'EQR', group:'Essential Quality', form:'QPS', target:90, targetLabel:'≥ 90%', unit:'%' },
+  { id:14, code:'EQR.38', std:'EQR.38/QPI.10', topic:'Incident reporting system', name:'Incident reporting rate per 100 admissions', dept:'EQR', group:'Essential Quality', form:'QPS', target:2, targetLabel:'≥ 2 per 100', unit:'per 100' },
+  { id:15, code:'EQR.39', std:'EQR.39/QPI.11', topic:'Sentinel events', name:'Sentinel event RCA completion rate within 45 days', dept:'EQR', group:'Essential Quality', form:'QPS', target:100, targetLabel:'100%', unit:'%' },
+];
+
+const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const FORMS = ['Nursing & OR','Laboratory','Pharmacy','Medical Records','QPS'];
+const FORM_COLORS = { 'Nursing & OR':'blue', 'Laboratory':'amber', 'Pharmacy':'green', 'Medical Records':'purple', 'QPS':'coral' };
+
+// ─────────────────────────────────────────────
+// STATE
+// ─────────────────────────────────────────────
+let state = {
+  view: CONFIG.SHEET_ID && CONFIG.API_KEY ? 'dashboard' : 'setup',
+  data: {},       // { "2025-05": { kpi_id: result_value } }
+  selectedMonth: getCurrentMonthKey(),
+  loading: false,
+  saving: false,
+  toast: null,
+  formView: 'Nursing & OR',
+  formData: {},   // { kpi_id: { num, den } }
+};
+
+function getCurrentMonthKey() {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+}
+
+function monthLabel(key) {
+  const [y,m] = key.split('-');
+  return `${MONTHS[parseInt(m)-1]} ${y}`;
+}
+
+// ─────────────────────────────────────────────
+// GOOGLE SHEETS API
+// ─────────────────────────────────────────────
+async function fetchSheetData() {
+  if (!CONFIG.SHEET_ID || !CONFIG.API_KEY) return {};
+  const range = `${CONFIG.SHEET_NAME}!A:E`;
+  const url = `https://sheets.googleapis.com/v4/spreadsheets/${CONFIG.SHEET_ID}/values/${encodeURIComponent(range)}?key=${CONFIG.API_KEY}`;
+  try {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error('Failed to fetch');
+    const json = await res.json();
+    const rows = json.values || [];
+    const data = {};
+    rows.forEach(row => {
+      if (row[0] === 'month') return; // header
+      const [month, kpiId, numerator, denominator, result] = row;
+      if (!data[month]) data[month] = {};
+      data[month][kpiId] = { numerator: parseFloat(numerator)||0, denominator: parseFloat(denominator)||0, result: parseFloat(result)||0 };
+    });
+    return data;
+  } catch(e) {
+    console.error(e);
+    return {};
+  }
+}
+
+async function appendToSheet(month, kpiId, numerator, denominator, result) {
+  const url = `https://sheets.googleapis.com/v4/spreadsheets/${CONFIG.SHEET_ID}/values/${encodeURIComponent(CONFIG.SHEET_NAME+'!A:E')}:append?valueInputOption=RAW&key=${CONFIG.API_KEY}`;
+  const body = { values: [[month, String(kpiId), String(numerator), String(denominator), String(result)]] };
+  try {
+    const res = await fetch(url, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.error?.message || 'Write failed');
+    }
+    return true;
+  } catch(e) {
+    showToast('Error saving: ' + e.message, 'error');
+    return false;
+  }
+}
+
+// ─────────────────────────────────────────────
+// RENDER ENGINE
+// ─────────────────────────────────────────────
+function render() {
+  document.getElementById('app').innerHTML = buildApp();
+  attachEvents();
+}
+
+function buildApp() {
+  return `
+    <div class="shell">
+      ${buildSidebar()}
+      <div class="main">
+        ${buildTopbar()}
+        <div class="content">
+          ${state.view === 'setup' ? buildSetup() : ''}
+          ${state.view === 'dashboard' ? buildDashboard() : ''}
+          ${state.view === 'entry' ? buildEntry() : ''}
+          ${state.view === 'trends' ? buildTrends() : ''}
+        </div>
+      </div>
+    </div>
+    ${buildToast()}
+  `;
+}
+
+function buildSidebar() {
+  const isConnected = CONFIG.SHEET_ID && CONFIG.API_KEY;
+  return `
+    <nav class="sidebar">
+      <div class="sidebar-logo">
+        <div class="hosp">Dream Hospital</div>
+        <div class="sub">KPI · GAHAR Provisional</div>
+      </div>
+      <div class="sidebar-nav">
+        <div class="nav-section">Monitor</div>
+        ${navItem('dashboard','📊','Dashboard')}
+        ${navItem('trends','📈','Trends')}
+        <div class="nav-section" style="margin-top:8px">Data Entry</div>
+        ${FORMS.map(f => navItemForm(f)).join('')}
+        <div class="nav-section" style="margin-top:8px">System</div>
+        ${navItem('setup','⚙','Setup')}
+      </div>
+      <div class="sidebar-footer">
+        <div class="gsheet-status">Google Sheets<br><span>${isConnected ? '● Connected' : '○ Not connected'}</span></div>
+      </div>
+    </nav>
+  `;
+}
+
+function navItem(viewName, icon, label) {
+  const active = state.view === viewName ? 'active' : '';
+  return `<div class="nav-item ${active}" onclick="navigate('${viewName}')">${label}</div>`;
+}
+
+function navItemForm(formName) {
+  const active = (state.view === 'entry' && state.formView === formName) ? 'active' : '';
+  return `<div class="nav-item ${active}" style="padding-left:24px; font-size:12px;" onclick="navigateForm('${formName}')">${formName}</div>`;
+}
+
+function buildTopbar() {
+  const titles = { dashboard:'Dashboard', entry:'Data Entry — '+state.formView, trends:'Trends', setup:'Setup & Configuration' };
+  const now = new Date();
+  return `
+    <div class="topbar">
+      <h1>${titles[state.view] || 'Dashboard'}</h1>
+      <div class="meta">${now.toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'})}</div>
+    </div>
+  `;
+}
+
+// ─────────────────────────────────────────────
+// DASHBOARD VIEW
+// ─────────────────────────────────────────────
+function buildDashboard() {
+  const monthData = state.data[state.selectedMonth] || {};
+  let met=0, notMet=0, noData=0;
+  KPI_LIST.forEach(k => {
+    const d = monthData[k.id];
+    if (!d) { noData++; return; }
+    if (d.result >= k.target) met++; else notMet++;
+  });
+
+  const recentMonths = getRecentMonths(6);
+
+  return `
+    <div class="month-row">
+      <span class="text-small text-muted" style="margin-right:4px">Month:</span>
+      ${recentMonths.map(m => `<button class="month-btn ${m===state.selectedMonth?'active':''}" onclick="selectMonth('${m}')">${monthLabel(m)}</button>`).join('')}
+      <button class="btn btn-secondary" style="margin-left:auto; font-size:12px; padding:5px 12px" onclick="loadData()">
+        ${state.loading ? '<span class="spinner"></span>' : '↻ Refresh'}
+      </button>
+    </div>
+
+    <div class="stats-grid">
+      <div class="stat-card blue">
+        <div class="label">Total KPIs</div>
+        <div class="value">15</div>
+        <div class="sublabel">GAHAR provisional</div>
+      </div>
+      <div class="stat-card green">
+        <div class="label">Meeting target</div>
+        <div class="value">${met}</div>
+        <div class="sublabel">${monthLabel(state.selectedMonth)}</div>
+      </div>
+      <div class="stat-card red">
+        <div class="label">Below target</div>
+        <div class="value">${notMet}</div>
+        <div class="sublabel">${monthLabel(state.selectedMonth)}</div>
+      </div>
+      <div class="stat-card amber">
+        <div class="label">No data yet</div>
+        <div class="value">${noData}</div>
+        <div class="sublabel">${monthLabel(state.selectedMonth)}</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">KPI Results — ${monthLabel(state.selectedMonth)}</span>
+        <span class="text-small text-muted">${15-noData} of 15 reported</span>
+      </div>
+      ${buildKpiTable(monthData)}
+    </div>
+  `;
+}
+
+function buildKpiTable(monthData) {
+  const groups = [...new Set(KPI_LIST.map(k=>k.group))];
+  let html = `<table class="kpi-table"><thead><tr>
+    <th>#</th><th>Code</th><th>KPI</th><th>Form</th><th>Result</th><th style="min-width:140px">vs Target</th><th>Target</th><th>Status</th>
+  </tr></thead><tbody>`;
+
+  groups.forEach(group => {
+    html += `<tr><td colspan="8" class="dept-group-header">${group}</td></tr>`;
+    KPI_LIST.filter(k=>k.group===group).forEach(k => {
+      const d = monthData[k.id];
+      const result = d ? d.result : null;
+      const status = result === null ? 'no-data' : (result >= k.target ? 'met' : 'not-met');
+      const pct = result !== null ? Math.min(100, (result / (k.target||1)) * 100) : 0;
+      html += `<tr>
+        <td class="kpi-code">${k.id}</td>
+        <td class="kpi-code">${k.code}</td>
+        <td class="kpi-name">${k.name}</td>
+        <td><span class="kpi-dept dept-${k.dept}">${k.form}</span></td>
+        <td class="result-value" style="color:${status==='met'?'var(--green)':status==='not-met'?'var(--red)':'var(--text3)'}">
+          ${result !== null ? result.toFixed(1) + (k.unit==='%'?'%':' /100') : '—'}
+        </td>
+        <td>
+          <div style="display:flex; align-items:center; gap:8px;">
+            <div class="progress-bar-wrap">
+              <div class="progress-bar-fill ${status}" style="width:${pct}%"></div>
+            </div>
+            <span style="font-size:11px; font-family:var(--mono); color:var(--text3); min-width:30px">${result!==null?Math.round(pct)+'%':''}</span>
+          </div>
+        </td>
+        <td class="target-val">${k.targetLabel}</td>
+        <td>
+          <span class="status-badge ${status}">
+            <span class="status-dot"></span>
+            ${status==='met'?'Met':status==='not-met'?'Below':'No data'}
+          </span>
+        </td>
+      </tr>`;
+    });
+  });
+
+  html += '</tbody></table>';
+  return html;
+}
+
+// ─────────────────────────────────────────────
+// ENTRY VIEW
+// ─────────────────────────────────────────────
+function buildEntry() {
+  const formKpis = KPI_LIST.filter(k => k.form === state.formView);
+  const monthData = state.data[state.selectedMonth] || {};
+
+  return `
+    <div class="month-row">
+      <span class="text-small text-muted" style="margin-right:4px">Entering data for:</span>
+      ${getRecentMonths(3).map(m => `<button class="month-btn ${m===state.selectedMonth?'active':''}" onclick="selectMonth('${m}')">${monthLabel(m)}</button>`).join('')}
+    </div>
+
+    <div class="card mb-20">
+      <div class="card-header">
+        <span class="card-title">${state.formView} — ${monthLabel(state.selectedMonth)}</span>
+        <span class="text-small text-muted">${formKpis.length} KPIs for this area</span>
+      </div>
+      <div class="card-body">
+        ${formKpis.map(k => buildKpiEntryRow(k, monthData[k.id])).join('')}
+
+        <div style="margin-top:24px; padding-top:20px; border-top:1px solid var(--border); display:flex; justify-content:flex-end; gap:10px">
+          <button class="btn btn-secondary" onclick="navigate('dashboard')">Cancel</button>
+          <button class="btn btn-success" onclick="saveFormData()" ${state.saving?'disabled':''}>
+            ${state.saving ? '<span class="spinner"></span> Saving…' : '✓ Save to Google Sheets'}
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div class="card" style="background:var(--amber-bg); border-color:var(--amber-border)">
+      <div class="card-body" style="padding:14px 18px">
+        <p style="font-size:12px; color:var(--amber); line-height:1.7">
+          <strong>How to fill in:</strong> Enter the numerator (events that met the criteria) and denominator (total events reviewed).
+          The result % is calculated automatically. Leave blank if data is not yet available for this month.
+        </p>
+      </div>
+    </div>
+  `;
+}
+
+function buildKpiEntryRow(kpi, existing) {
+  const num = state.formData[kpi.id]?.num ?? (existing?.numerator ?? '');
+  const den = state.formData[kpi.id]?.den ?? (existing?.denominator ?? '');
+  const calcResult = (num !== '' && den !== '' && parseFloat(den) > 0) ? ((parseFloat(num)/parseFloat(den))*100).toFixed(1) : null;
+  const status = calcResult !== null ? (parseFloat(calcResult) >= kpi.target ? 'met' : 'not-met') : 'no-data';
+
+  return `
+    <div style="padding:16px 0; border-bottom:1px solid var(--border)">
+      <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:16px; flex-wrap:wrap">
+        <div style="flex:1; min-width:200px">
+          <div style="font-weight:600; font-size:13px; margin-bottom:2px">${kpi.name}</div>
+          <div style="font-size:11px; color:var(--text3); font-family:var(--mono)">${kpi.code} · Target: ${kpi.targetLabel}</div>
+        </div>
+        <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap">
+          <div class="field" style="width:110px">
+            <label>Numerator</label>
+            <input type="number" min="0" placeholder="e.g. 28"
+              value="${num}"
+              oninput="updateFormField(${kpi.id}, 'num', this.value)"
+            />
+          </div>
+          <div class="field" style="width:110px">
+            <label>Denominator</label>
+            <input type="number" min="0" placeholder="e.g. 30"
+              value="${den}"
+              oninput="updateFormField(${kpi.id}, 'den', this.value)"
+            />
+          </div>
+          <div style="text-align:center; min-width:80px">
+            <div style="font-size:10px; color:var(--text3); text-transform:uppercase; letter-spacing:0.05em; margin-bottom:3px">Result</div>
+            <div style="font-size:20px; font-weight:600; font-family:var(--mono); color:${status==='met'?'var(--green)':status==='not-met'?'var(--red)':'var(--text3)'}">
+              ${kpi.unit === '%' ? (calcResult !== null ? calcResult+'%' : '—') : (calcResult !== null ? (parseFloat(calcResult)*kpi.target/100).toFixed(1) : '—')}
+            </div>
+            ${calcResult !== null ? `<div style="font-size:10px; margin-top:2px"><span class="status-badge ${status}" style="font-size:10px">${status==='met'?'✓ Met':'✗ Below'}</span></div>` : ''}
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+// ─────────────────────────────────────────────
+// TRENDS VIEW
+// ─────────────────────────────────────────────
+function buildTrends() {
+  const months = getRecentMonths(6);
+  return `
+    <p class="text-small text-muted mb-16">Showing last 6 months — ${months.map(monthLabel).join(', ')}</p>
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px">
+      ${KPI_LIST.slice(0,8).map(k => buildTrendCard(k, months)).join('')}
+    </div>
+    <p class="text-small text-muted" style="margin-top:16px; text-align:center">Showing first 8 KPIs. Enter more data to see fuller trends.</p>
+  `;
+}
+
+function buildTrendCard(kpi, months) {
+  const values = months.map(m => {
+    const d = state.data[m]?.[kpi.id];
+    return d ? d.result : null;
+  });
+  const hasData = values.some(v => v !== null);
+  const maxVal = 100;
+  const barW = 28;
+  const chartH = 70;
+
+  const bars = values.map((v, i) => {
+    if (v === null) return `<rect x="${i*(barW+6)}" y="${chartH}" width="${barW}" height="0" fill="var(--border2)" rx="2"/>`;
+    const h = Math.round((v/maxVal)*chartH);
+    const y = chartH - h;
+    const color = v >= kpi.target ? 'var(--green)' : 'var(--red)';
+    return `
+      <rect x="${i*(barW+6)}" y="${y}" width="${barW}" height="${h}" fill="${color}" rx="2" opacity="0.85"/>
+      <text x="${i*(barW+6)+barW/2}" y="${y-4}" text-anchor="middle" font-size="9" fill="var(--text2)" font-family="IBM Plex Mono">${v.toFixed(0)}</text>
+    `;
+  });
+
+  const latest = values.filter(v=>v!==null).pop();
+
+  return `
+    <div class="card">
+      <div class="card-header" style="padding:12px 14px">
+        <div>
+          <div style="font-size:12px; font-weight:600">${kpi.name}</div>
+          <div style="font-size:10px; color:var(--text3); font-family:var(--mono); margin-top:1px">${kpi.code} · Target: ${kpi.targetLabel}</div>
+        </div>
+        ${latest !== undefined && latest !== null ? `<span class="status-badge ${latest>=kpi.target?'met':'not-met'}" style="font-size:10px">${latest.toFixed(1)}%</span>` : ''}
+      </div>
+      <div class="card-body" style="padding:14px">
+        ${hasData ? `
+          <svg width="100%" viewBox="0 0 ${values.length*(barW+6)-6} ${chartH+20}" style="overflow:visible">
+            <line x1="0" y1="${chartH}" x2="${values.length*(barW+6)-6}" y2="${chartH}" stroke="var(--border)" stroke-width="0.5"/>
+            <line x1="0" y1="${chartH - (kpi.target/maxVal)*chartH}" x2="${values.length*(barW+6)-6}" y2="${chartH - (kpi.target/maxVal)*chartH}" stroke="var(--amber)" stroke-width="1" stroke-dasharray="3,3"/>
+            ${bars.join('')}
+            ${months.map((m,i) => `<text x="${i*(barW+6)+barW/2}" y="${chartH+14}" text-anchor="middle" font-size="8" fill="var(--text3)" font-family="IBM Plex Sans">${monthLabel(m).split(' ')[0]}</text>`).join('')}
+          </svg>
+        ` : `<div class="empty-state" style="padding:20px 0"><p>No data yet. Enter data using the forms.</p></div>`}
+      </div>
+    </div>
+  `;
+}
+
+// ─────────────────────────────────────────────
+// SETUP VIEW
+// ─────────────────────────────────────────────
+function buildSetup() {
+  return `
+    <div style="max-width:680px">
+      <div style="margin-bottom:24px">
+        <h2 style="font-size:18px; font-weight:600; margin-bottom:6px">Connect to Google Sheets</h2>
+        <p class="text-muted text-small">Follow these 3 steps once. After setup, the whole team can enter data from any device.</p>
+      </div>
+
+      <!-- STEP 1 -->
+      <div class="setup-step">
+        <div class="step-header">
+          <div class="step-num">1</div>
+          <div class="step-title">Create the Google Sheet</div>
+        </div>
+        <div class="step-desc">
+          <p>Open <a href="https://sheets.google.com" target="_blank" style="color:var(--accent)">sheets.google.com</a> and create a new spreadsheet. Name it <strong>Dream Hospital KPI</strong>.</p>
+          <p style="margin-top:8px">Add a sheet tab named exactly <strong>KPI_Data</strong> and put these headers in row 1:</p>
+        </div>
+        <div class="code-block">
+          <span class="c">A1:</span> month &nbsp;&nbsp;
+          <span class="c">B1:</span> kpi_id &nbsp;&nbsp;
+          <span class="c">C1:</span> numerator &nbsp;&nbsp;
+          <span class="c">D1:</span> denominator &nbsp;&nbsp;
+          <span class="c">E1:</span> result
+        </div>
+        <p style="font-size:12px; color:var(--text3); margin-top:6px">Copy the spreadsheet URL. You'll need the ID from it in step 2.</p>
+      </div>
+
+      <!-- STEP 2 -->
+      <div class="setup-step">
+        <div class="step-header">
+          <div class="step-num">2</div>
+          <div class="step-title">Make the sheet public (read + write)</div>
+        </div>
+        <div class="step-desc">
+          <p>In your Google Sheet: click <strong>Share</strong> → <strong>Anyone with the link</strong> → set to <strong>Editor</strong> → click Done.</p>
+          <p style="margin-top:8px">This allows the dashboard to read and write data without requiring each team member to log in.</p>
+        </div>
+      </div>
+
+      <!-- STEP 3 -->
+      <div class="setup-step">
+        <div class="step-header">
+          <div class="step-num">3</div>
+          <div class="step-title">Get a Google API key</div>
+        </div>
+        <div class="step-desc">
+          <ol style="padding-left:16px; line-height:2">
+            <li>Go to <a href="https://console.cloud.google.com" target="_blank" style="color:var(--accent)">console.cloud.google.com</a></li>
+            <li>Create a new project (name it anything, e.g. "KPI Dashboard")</li>
+            <li>Go to <strong>APIs & Services → Library</strong> → search <strong>Google Sheets API</strong> → Enable it</li>
+            <li>Go to <strong>APIs & Services → Credentials</strong> → Create credentials → <strong>API key</strong></li>
+            <li>Copy the API key (looks like: <span class="font-mono" style="font-size:12px">AIzaSyABC123...</span>)</li>
+          </ol>
+        </div>
+      </div>
+
+      <!-- STEP 4: Enter credentials -->
+      <div class="setup-step" style="border:2px solid var(--accent)">
+        <div class="step-header">
+          <div class="step-num" style="background:var(--accent)">4</div>
+          <div class="step-title">Enter your credentials below</div>
+        </div>
+        <div class="step-desc" style="margin-bottom:12px">
+          Get the Sheet ID from the URL: <span class="font-mono" style="font-size:12px">docs.google.com/spreadsheets/d/<strong>[SHEET_ID]</strong>/edit</span>
+        </div>
+        <div class="form-grid">
+          <div class="field">
+            <label>Google Sheet ID</label>
+            <input type="text" id="inp-sheet-id" placeholder="1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgVE2upms" value="${CONFIG.SHEET_ID}" />
+          </div>
+          <div class="field">
+            <label>Google API Key</label>
+            <input type="text" id="inp-api-key" placeholder="AIzaSyABC123..." value="${CONFIG.API_KEY}" />
+          </div>
+        </div>
+        <div style="margin-top:14px; display:flex; gap:10px">
+          <button class="btn btn-primary" onclick="saveCredentials()">Save & Connect</button>
+          ${CONFIG.SHEET_ID ? `<button class="btn btn-secondary" onclick="navigate('dashboard')">Back to Dashboard</button>` : ''}
+        </div>
+      </div>
+
+      <div style="margin-top:16px; padding:14px 18px; background:var(--surface2); border-radius:var(--radius); border:1px solid var(--border)">
+        <p style="font-size:12px; color:var(--text2); line-height:1.7">
+          <strong>Your credentials are stored only in this browser.</strong> They are never sent anywhere except directly to Google's API.
+          Share this app's URL with your team — each person will need to enter the credentials once on their device.
+          Consider adding the API key restriction in Google Console to only allow requests from your hospital's domain.
+        </p>
+      </div>
+    </div>
+  `;
+}
+
+// ─────────────────────────────────────────────
+// TOAST
+// ─────────────────────────────────────────────
+function buildToast() {
+  if (!state.toast) return `<div class="toast" id="toast"></div>`;
+  return `<div class="toast show ${state.toast.type}" id="toast">${state.toast.msg}</div>`;
+}
+
+function showToast(msg, type='success') {
+  state.toast = {msg, type};
+  render();
+  setTimeout(() => { state.toast = null; render(); }, 3500);
+}
+
+// ─────────────────────────────────────────────
+// HELPERS
+// ─────────────────────────────────────────────
+function getRecentMonths(n) {
+  const months = [];
+  const now = new Date();
+  for (let i = n-1; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth()-i, 1);
+    months.push(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`);
+  }
+  return months;
+}
+
+// ─────────────────────────────────────────────
+// ACTIONS (attached after render)
+// ─────────────────────────────────────────────
+function attachEvents() {
+  window.navigate = function(view) {
+    state.view = view;
+    render();
+    if (view === 'dashboard' || view === 'trends') loadData();
+  };
+
+  window.navigateForm = function(formName) {
+    state.view = 'entry';
+    state.formView = formName;
+    state.formData = {};
+    render();
+  };
+
+  window.selectMonth = function(m) {
+    state.selectedMonth = m;
+    state.formData = {};
+    render();
+  };
+
+  window.loadData = async function() {
+    if (!CONFIG.SHEET_ID || !CONFIG.API_KEY) return;
+    state.loading = true;
+    render();
+    state.data = await fetchSheetData();
+    state.loading = false;
+    render();
+  };
+
+  window.updateFormField = function(kpiId, field, value) {
+    if (!state.formData[kpiId]) state.formData[kpiId] = {};
+    state.formData[kpiId][field] = value;
+    // Re-render just the result display without full rerender
+    const kpi = KPI_LIST.find(k=>k.id===kpiId);
+    const num = state.formData[kpiId].num ?? '';
+    const den = state.formData[kpiId].den ?? '';
+    const calcResult = (num !== '' && den !== '' && parseFloat(den) > 0) ? ((parseFloat(num)/parseFloat(den))*100).toFixed(1) : null;
+    const status = calcResult !== null ? (parseFloat(calcResult) >= kpi.target ? 'met' : 'not-met') : 'no-data';
+    // Update result display inline
+    const rows = document.querySelectorAll('[data-kpi-result]');
+    rows.forEach(el => {
+      if (el.getAttribute('data-kpi-result') === String(kpiId)) {
+        el.textContent = calcResult !== null ? calcResult + '%' : '—';
+        el.style.color = status==='met'?'var(--green)':status==='not-met'?'var(--red)':'var(--text3)';
+      }
+    });
+  };
+
+  window.saveFormData = async function() {
+    if (!CONFIG.SHEET_ID || !CONFIG.API_KEY) {
+      showToast('Please complete setup first', 'error');
+      return;
+    }
+    const formKpis = KPI_LIST.filter(k => k.form === state.formView);
+    let savedCount = 0;
+    state.saving = true;
+    render();
+
+    for (const kpi of formKpis) {
+      const fd = state.formData[kpi.id];
+      if (!fd || fd.num === '' || fd.den === '' || fd.num === undefined || fd.den === undefined) continue;
+      const num = parseFloat(fd.num);
+      const den = parseFloat(fd.den);
+      if (isNaN(num) || isNaN(den) || den === 0) continue;
+      const result = parseFloat(((num/den)*100).toFixed(2));
+      const ok = await appendToSheet(state.selectedMonth, kpi.id, num, den, result);
+      if (ok) savedCount++;
+    }
+
+    // Reload data
+    state.data = await fetchSheetData();
+    state.formData = {};
+    state.saving = false;
+
+    if (savedCount > 0) {
+      showToast(`✓ ${savedCount} KPI${savedCount>1?'s':''} saved to Google Sheets`);
+    } else {
+      showToast('No new data entered', 'error');
+    }
+  };
+
+  window.saveCredentials = function() {
+    const sheetId = document.getElementById('inp-sheet-id')?.value?.trim();
+    const apiKey  = document.getElementById('inp-api-key')?.value?.trim();
+    if (!sheetId || !apiKey) {
+      showToast('Please enter both Sheet ID and API Key', 'error');
+      return;
+    }
+    localStorage.setItem('kpi_sheet_id', sheetId);
+    localStorage.setItem('kpi_api_key', apiKey);
+    CONFIG.SHEET_ID = sheetId;
+    CONFIG.API_KEY  = apiKey;
+    showToast('✓ Credentials saved! Loading data…');
+    setTimeout(() => navigate('dashboard'), 800);
+  };
+}
+
+// ─────────────────────────────────────────────
+// INIT
+// ─────────────────────────────────────────────
+render();
+if (CONFIG.SHEET_ID && CONFIG.API_KEY) {
+  fetchSheetData().then(data => {
+    state.data = data;
+    render();
+  });
+}
+</script>
+</body>
+</html>
